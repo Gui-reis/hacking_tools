@@ -240,8 +240,65 @@ check_sensitive_files() {
       done
 }
 
+check_custom_interesting_files() {
+  section "8. Custom/readable/writable/executable interesting files"
+
+  note "Goal: find challenge/app/custom artifacts that are readable/writable/executable by the current user."
+  note "This is intentionally focused on non-system locations to reduce noise."
+
+  SEARCH_PATHS="/home /opt /srv /var/www /var/backups /incidents /tmp"
+
+  note "Readable interesting files by name/extension:"
+  find $SEARCH_PATHS -xdev -type f -readable \( \
+    -iname '*.pcap' -o -iname '*.pcapng' -o -iname '*.cap' -o \
+    -iname '*.log' -o -iname '*.txt' -o -iname '*.md' -o \
+    -iname '*.bak' -o -iname '*.backup' -o -iname '*.old' -o \
+    -iname '*.zip' -o -iname '*.tar' -o -iname '*.tar.gz' -o -iname '*.tgz' -o \
+    -iname '*.sql' -o -iname '*.db' -o -iname '*.sqlite' -o \
+    -iname '.env' -o -iname '*.env' -o \
+    -iname '*secret*' -o -iname '*password*' -o -iname '*passwd*' -o \
+    -iname '*credential*' -o -iname '*token*' -o -iname '*key*' -o \
+    -iname '*incident*' -o -iname '*suspicious*' -o -iname '*capture*' -o \
+    -iname 'config.*' -o -iname '*config*' \
+  \) 2>/dev/null | sort | head -150 | while read -r file; do
+    perms="$(ls -lh "$file" 2>/dev/null)"
+    if [ -w "$file" ]; then
+      warn "Readable + writable interesting file: $file"
+    elif [ -x "$file" ]; then
+      warn "Readable + executable interesting file: $file"
+    else
+      info "Readable interesting file: $file"
+    fi
+    echo "  $perms"
+  done
+
+  note "Executable custom files/scripts in likely custom locations:"
+  find /home /opt /srv /var/www /tmp -xdev -type f -executable 2>/dev/null \
+    | grep -Ev '/(node_modules|vendor|\.git|__pycache__)/' \
+    | sort \
+    | head -100 \
+    | while read -r file; do
+        if [ -w "$file" ]; then
+          crit "Executable custom file is writable: $file"
+        else
+          warn "Executable custom file: $file"
+        fi
+        ls -lh "$file" 2>/dev/null | sed 's/^/  /'
+      done
+
+  note "Writable custom files in likely custom locations:"
+  find /home /opt /srv /var/www /tmp -xdev -type f -writable 2>/dev/null \
+    | grep -Ev '/(node_modules|vendor|\.git|__pycache__)/' \
+    | sort \
+    | head -100 \
+    | while read -r file; do
+        warn "Writable custom file: $file"
+        ls -lh "$file" 2>/dev/null | sed 's/^/  /'
+      done
+}
+
 check_dangerous_permissions() {
-  section "8. Dangerous permissions"
+  section "9. Dangerous permissions"
 
   for file in /etc/passwd /etc/shadow /etc/sudoers; do
     if is_writable "$file"; then
@@ -270,6 +327,7 @@ check_capabilities
 check_cron_timers
 check_processes_ports
 check_sensitive_files
+check_custom_interesting_files
 check_dangerous_permissions
 
 printf "\n%b\n" "${BLUE}Done.${NC} Review [CRITICAL] and [HIGH] findings first."
